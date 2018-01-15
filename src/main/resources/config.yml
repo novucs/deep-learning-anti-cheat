@@ -1,0 +1,7 @@
+classification-server:
+  host: localhost
+  port: 14454
+combat-expiry-millis: 3000
+min-history-length: 50
+max-history-length: 500
+combatant-tick-rate: 300

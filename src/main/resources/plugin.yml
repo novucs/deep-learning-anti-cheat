@@ -1,0 +1,9 @@
+name: ${project.name}
+main: ${project.groupId}.${project.artifactId}.${project.name}Plugin
+version: ${project.version}
+description: ${project.description}
+author: novucs
+depend: [ProtocolLib]
+commands:
+  dlac:
+    description: Deep learning anti-cheat main command.
