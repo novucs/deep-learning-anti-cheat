@@ -69,6 +69,16 @@ public class AntiCheatPlugin extends JavaPlugin {
     }
 
     @Override
+    public void onDisable() {
+        getLogger().info("Shutting down connection manager...");
+        connectionManager.interrupt();
+        try {
+            connectionManager.join();
+        } catch (InterruptedException ignore) {
+        }
+    }
+
+    @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length < 2) {
             sender.sendMessage("Usage: /dlac mode <mode>");
@@ -118,6 +128,7 @@ public class AntiCheatPlugin extends JavaPlugin {
 
                 if (snippet.getCombatMode() == CombatMode.UNKNOWN) {
                     // Player is not teaching, perform a check.
+                    // TODO: Add player to ban wave when we are confident they are hacking.
                     connectionManager.send(Packet.check(snippet), System.out::println);
                 } else if (snippet.getCombatMode() != CombatMode.EXEMPT) {
                     // Add valid combat snippet to the dataset.
