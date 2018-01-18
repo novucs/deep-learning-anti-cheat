@@ -22,8 +22,6 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
-import static org.bukkit.util.NumberConversions.square;
-
 public class AntiCheatPlugin extends JavaPlugin {
 
     private final ConnectionManager connectionManager = new ConnectionManager(this);
@@ -200,9 +198,9 @@ public class AntiCheatPlugin extends JavaPlugin {
         Location origin = profile.getLastLocation();
 
         long time = profile.getLastPacket() - System.currentTimeMillis();
-        double x = square(origin.getX() - packet.getX());
-        double y = square(origin.getY() - packet.getY());
-        double z = square(origin.getZ() - packet.getZ());
+        double x = origin.getX() - packet.getX();
+        double y = origin.getY() - packet.getY();
+        double z = origin.getZ() - packet.getZ();
 
         PlayerPacket playerPacket = PlayerPacket.position(time, x, y, z);
         profile.getActiveCombatSnippet().getPacketHistory().add(playerPacket);
@@ -219,8 +217,8 @@ public class AntiCheatPlugin extends JavaPlugin {
         Location origin = profile.getLastLocation();
 
         long time = profile.getLastPacket() - System.currentTimeMillis();
-        double yaw = square(origin.getYaw() - packet.getYaw());
-        double pitch = square(origin.getPitch() - packet.getPitch());
+        double yaw = origin.getYaw() - packet.getYaw();
+        double pitch = origin.getPitch() - packet.getPitch();
 
         PlayerPacket playerPacket = PlayerPacket.look(time, yaw, pitch);
         profile.getActiveCombatSnippet().getPacketHistory().add(playerPacket);
@@ -237,11 +235,11 @@ public class AntiCheatPlugin extends JavaPlugin {
         Location origin = profile.getLastLocation();
 
         long time = profile.getLastPacket() - System.currentTimeMillis();
-        double x = square(origin.getX() - packet.getX());
-        double y = square(origin.getY() - packet.getY());
-        double z = square(origin.getZ() - packet.getZ());
-        double yaw = square(origin.getYaw() - packet.getYaw());
-        double pitch = square(origin.getPitch() - packet.getPitch());
+        double x = origin.getX() - packet.getX();
+        double y = origin.getY() - packet.getY();
+        double z = origin.getZ() - packet.getZ();
+        double yaw = origin.getYaw() - packet.getYaw();
+        double pitch = origin.getPitch() - packet.getPitch();
 
         PlayerPacket playerPacket = PlayerPacket.positionLook(time, x, y, z, yaw, pitch);
         profile.getActiveCombatSnippet().getPacketHistory().add(playerPacket);
