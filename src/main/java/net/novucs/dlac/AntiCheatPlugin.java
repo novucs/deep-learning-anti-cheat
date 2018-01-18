@@ -187,6 +187,7 @@ public class AntiCheatPlugin extends JavaPlugin {
         PlayerPacket playerPacket = PlayerPacket.attack(time, x, y, z, yaw, pitch);
         profile.getActiveCombatSnippet().getPacketHistory().add(playerPacket);
         profile.setLastPacket(System.currentTimeMillis());
+        profile.setExpiry(System.currentTimeMillis() + combatExpiryMillis);
     }
 
     private void onPosition(PacketEvent event) {
