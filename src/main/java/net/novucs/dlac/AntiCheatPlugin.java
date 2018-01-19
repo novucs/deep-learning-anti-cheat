@@ -42,10 +42,10 @@ public class AntiCheatPlugin extends JavaPlugin {
         String classificationServerHost = getConfig().getString("classification-server.host", "localhost");
         int classificationServerPort = getConfig().getInt("classification-server.port", 14454);
 
-        // Setup and run the connection manager.
+        // Setup and start the connection manager.
         connectionManager.getHost().set(classificationServerHost);
         connectionManager.getPort().set(classificationServerPort);
-        connectionManager.run();
+        connectionManager.start();
 
         // Register all combat packet listeners.
         ImmutableMap<PacketType, Consumer<PacketEvent>> listeners = ImmutableMap.of(
@@ -177,7 +177,7 @@ public class AntiCheatPlugin extends JavaPlugin {
 
         Location target = packet.getTarget(event).getLocation();
 
-        long time = profile.getLastPacket() - System.currentTimeMillis();
+        long time = System.currentTimeMillis() - profile.getLastPacket();
         double x = origin.getX() - target.getX();
         double y = origin.getY() - target.getY();
         double z = origin.getZ() - target.getZ();
@@ -198,7 +198,7 @@ public class AntiCheatPlugin extends JavaPlugin {
         WrapperPlayClientPosition packet = new WrapperPlayClientPosition(event.getPacket());
         Location origin = profile.getLastLocation();
 
-        long time = profile.getLastPacket() - System.currentTimeMillis();
+        long time = System.currentTimeMillis() - profile.getLastPacket();
         double x = origin.getX() - packet.getX();
         double y = origin.getY() - packet.getY();
         double z = origin.getZ() - packet.getZ();
@@ -217,7 +217,7 @@ public class AntiCheatPlugin extends JavaPlugin {
         WrapperPlayClientLook packet = new WrapperPlayClientLook(event.getPacket());
         Location origin = profile.getLastLocation();
 
-        long time = profile.getLastPacket() - System.currentTimeMillis();
+        long time = System.currentTimeMillis() - profile.getLastPacket();
         double yaw = origin.getYaw() - packet.getYaw();
         double pitch = origin.getPitch() - packet.getPitch();
 
@@ -235,7 +235,7 @@ public class AntiCheatPlugin extends JavaPlugin {
         WrapperPlayClientPositionLook packet = new WrapperPlayClientPositionLook(event.getPacket());
         Location origin = profile.getLastLocation();
 
-        long time = profile.getLastPacket() - System.currentTimeMillis();
+        long time = System.currentTimeMillis() - profile.getLastPacket();
         double x = origin.getX() - packet.getX();
         double y = origin.getY() - packet.getY();
         double z = origin.getZ() - packet.getZ();

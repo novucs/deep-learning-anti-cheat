@@ -52,20 +52,18 @@ public class ConnectionManager extends Thread {
 
         while (!Thread.interrupted()) {
             try {
-                socket = new Socket(host.get(), port.get());
-
-                DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-                DataInputStream in = new DataInputStream(socket.getInputStream());
-
                 while (!Thread.interrupted()) {
+                    socket = new Socket(host.get(), port.get());
+                    DataOutputStream out = new DataOutputStream(socket.getOutputStream());
                     Request request = sendQueue.take();
                     out.writeUTF(GSON.toJson(request.getPacket()));
                     out.flush();
 
+                    DataInputStream in = new DataInputStream(socket.getInputStream());
                     String response = in.readUTF();
                     request.getResponseCallback().accept(response);
+                    socket.close();
                 }
-
             } catch (IOException e) {
                 plugin.getLogger().log(Level.SEVERE, "Unable to communicate with classification server!");
                 plugin.getLogger().log(Level.SEVERE, "Retrying in 30 seconds...");
@@ -74,8 +72,10 @@ public class ConnectionManager extends Thread {
                 try {
                     Thread.sleep(TimeUnit.SECONDS.toMillis(30));
                 } catch (InterruptedException ignore) {
+                    interrupt();
                 }
             } catch (InterruptedException ignore) {
+                interrupt();
             } finally {
                 if (socket != null) {
                     try {
