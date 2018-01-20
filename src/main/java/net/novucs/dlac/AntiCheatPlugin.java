@@ -19,10 +19,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerMoveEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.*;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.*;
@@ -108,16 +105,15 @@ public class AntiCheatPlugin extends JavaPlugin implements Listener {
         player.setFoodLevel(20);
         if (!teachers.containsKey(player)) {
             sendTeachModeMessage(player);
-            event.setCancelled(true);
+            player.teleport(event.getFrom());
         }
     }
 
     @EventHandler
-    public void onInteract(PlayerInteractEvent event) {
+    public void onGameModeChange(PlayerGameModeChangeEvent event) {
         Player player = event.getPlayer();
-        if (!teachers.containsKey(player)) {
-            sendTeachModeMessage(player);
-            event.setCancelled(true);
+        if (player.getGameMode() == GameMode.SURVIVAL) {
+            captureSnippet(player, combatants.get(player));
         }
     }
 
@@ -131,6 +127,9 @@ public class AntiCheatPlugin extends JavaPlugin implements Listener {
         player.sendMessage("");
         player.sendMessage(ChatColor.YELLOW + "You /must/ make sure you tell the server whether you're hacking or not. " +
                 "To do this, execute: " + ChatColor.RED + "/dlac mode <hacking|vanilla>");
+        player.sendMessage("");
+        player.sendMessage(ChatColor.YELLOW + "WARNING: When training vanilla data, ONLY train using the vanilla client. " +
+                "Simply turning off hacked client features may still send signatures that we want to detect.");
         player.sendMessage("");
         player.sendMessage(ChatColor.YELLOW + "It's incredibly important you do not cross-contaminate training examples. " +
                 "Once registered, simply start attacking things while in survival mode.");
@@ -217,7 +216,7 @@ public class AntiCheatPlugin extends JavaPlugin implements Listener {
     }
 
     private void captureSnippet(Player player, CombatantProfile profile) {
-        if (profile.getActiveCombatSnippet().getPacketHistory().isEmpty()) {
+        if (profile == null || profile.getActiveCombatSnippet().getPacketHistory().isEmpty()) {
             return;
         }
 

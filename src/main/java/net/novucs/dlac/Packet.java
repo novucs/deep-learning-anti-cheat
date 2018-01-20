@@ -1,6 +1,8 @@
 package net.novucs.dlac;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.Getter;
 
 import java.util.Set;
 
@@ -14,8 +16,14 @@ public interface Packet {
         return new CheckPacket(combatSnippet);
     }
 
+    Type getType();
+
+    @AllArgsConstructor
+    @Getter
     enum Type {
-        DATASET, CHECK
+        DATASET(0),
+        CHECK(1);
+        private final int id;
     }
 
     @Data

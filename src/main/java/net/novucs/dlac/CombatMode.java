@@ -1,12 +1,21 @@
 package net.novucs.dlac;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
 import java.util.HashMap;
 import java.util.Map;
 
+@AllArgsConstructor
+@Getter
 public enum CombatMode {
-    UNKNOWN, VANILLA, HACKING, EXEMPT;
+    UNKNOWN(0),
+    VANILLA(1),
+    HACKING(2),
+    EXEMPT(3);
 
     private static final Map<String, CombatMode> BY_NAME = new HashMap<>();
+    private final int id;
 
     public static CombatMode match(String name) {
         name = name.toUpperCase();
