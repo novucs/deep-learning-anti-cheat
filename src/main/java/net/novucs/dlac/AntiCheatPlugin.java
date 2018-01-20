@@ -12,28 +12,37 @@ import com.comphenix.protocol.events.PacketEvent;
 import com.comphenix.protocol.wrappers.EnumWrappers;
 import com.google.common.collect.ImmutableMap;
 import org.bukkit.ChatColor;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
-public class AntiCheatPlugin extends JavaPlugin {
+public class AntiCheatPlugin extends JavaPlugin implements Listener {
 
+    private static final boolean TEACH_MODE = true;
     private final ConnectionManager connectionManager = new ConnectionManager(this);
     private final Map<Player, CombatMode> teachers = new WeakHashMap<>();
     private final Map<Player, CombatantProfile> combatants = new WeakHashMap<>();
-    private long combatExpiryMillis = TimeUnit.SECONDS.toMillis(3);
+    private long combatExpiryMillis = TimeUnit.SECONDS.toMillis(2);
     private int minHistoryLength = 50;
     private int maxHistoryLength = 500;
 
     @Override
     public void onEnable() {
         // Load settings.
+        saveDefaultConfig();
         combatExpiryMillis = getConfig().getLong("combat-expiry-millis", combatExpiryMillis);
         minHistoryLength = getConfig().getInt("min-history-length", minHistoryLength);
         maxHistoryLength = getConfig().getInt("max-history-length", maxHistoryLength);
@@ -64,6 +73,10 @@ public class AntiCheatPlugin extends JavaPlugin {
 
         // Schedule combatant processing task.
         getServer().getScheduler().runTaskTimer(this, this::tickCombatants, combatantTickRate, combatantTickRate);
+
+        if (TEACH_MODE) {
+            getServer().getPluginManager().registerEvents(this, this);
+        }
     }
 
     @Override
@@ -74,6 +87,57 @@ public class AntiCheatPlugin extends JavaPlugin {
             connectionManager.join();
         } catch (InterruptedException ignore) {
         }
+    }
+
+    @EventHandler
+    public void onJoin(PlayerJoinEvent event) {
+        Player player = event.getPlayer();
+        player.setGameMode(GameMode.CREATIVE);
+        sendTeachModeMessage(player);
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        teachers.remove(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onMove(PlayerMoveEvent event) {
+        Player player = event.getPlayer();
+        player.setHealth(20);
+        player.setFoodLevel(20);
+        if (!teachers.containsKey(player)) {
+            sendTeachModeMessage(player);
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
+    public void onInteract(PlayerInteractEvent event) {
+        Player player = event.getPlayer();
+        if (!teachers.containsKey(player)) {
+            sendTeachModeMessage(player);
+            event.setCancelled(true);
+        }
+    }
+
+    private void sendTeachModeMessage(Player player) {
+        for (int i = 0; i < 100; i++) {
+            player.sendMessage("");
+        }
+        player.sendMessage(ChatColor.DARK_GRAY + "" + ChatColor.BOLD + "|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||");
+        player.sendMessage("");
+        player.sendMessage(ChatColor.RED + "" + ChatColor.BOLD + "TEACH MODE IS CURRENTLY ACTIVE");
+        player.sendMessage("");
+        player.sendMessage(ChatColor.YELLOW + "You /must/ make sure you tell the server whether you're hacking or not. " +
+                "To do this, execute: " + ChatColor.RED + "/dlac mode <hacking|vanilla>");
+        player.sendMessage("");
+        player.sendMessage(ChatColor.YELLOW + "It's incredibly important you do not cross-contaminate training examples. " +
+                "Once registered, simply start attacking things while in survival mode.");
+        player.sendMessage("");
+        player.sendMessage(ChatColor.YELLOW + "Thanks for helping me train this thing!");
+        player.sendMessage("");
+        player.sendMessage(ChatColor.DARK_GRAY + "" + ChatColor.BOLD + "|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||");
     }
 
     @Override
@@ -88,7 +152,7 @@ public class AntiCheatPlugin extends JavaPlugin {
             return true;
         }
 
-        CombatMode mode = CombatMode.getByName(args[1]);
+        CombatMode mode = CombatMode.match(args[1]);
 
         if (mode == null) {
             sender.sendMessage("No mode of that name was found!");
@@ -113,10 +177,14 @@ public class AntiCheatPlugin extends JavaPlugin {
         Set<Player> activeTeachers = new HashSet<>();
 
         combatants.forEach((player, profile) -> {
-            CombatSnippet snippet = profile.getActiveCombatSnippet();
+            captureSnippet(player, profile);
+            List<CombatSnippet> snippets = profile.getCombatSnippetHistory();
 
-            // Ignore all combat snippets with short histories.
-            if (snippet.getPacketHistory().size() > minHistoryLength) {
+            for (CombatSnippet snippet : snippets) {
+                // Ignore all combat snippets with short histories.
+                if (snippet.getPacketHistory().size() <= minHistoryLength) {
+                    continue;
+                }
 
                 // Trim large combat snippet histories.
                 int size;
@@ -127,17 +195,17 @@ public class AntiCheatPlugin extends JavaPlugin {
                 if (snippet.getCombatMode() == CombatMode.UNKNOWN) {
                     // Player is not teaching, perform a check.
                     // TODO: Add player to ban wave when we are confident they are hacking.
-                    connectionManager.send(Packet.check(snippet), System.out::println);
+                    connectionManager.send(Packet.check(snippet), response ->
+                            getServer().broadcastMessage(ChatColor.GREEN + "[DLAC] " + ChatColor.WHITE + response));
                 } else if (snippet.getCombatMode() != CombatMode.EXEMPT) {
                     // Add valid combat snippet to the dataset.
-                    dataset.add(profile.getActiveCombatSnippet());
+                    dataset.add(snippet);
                     activeTeachers.add(player);
                 }
             }
 
-            // Reset the players combat snippet.
-            CombatMode combatMode = teachers.getOrDefault(player, CombatMode.UNKNOWN);
-            profile.setActiveCombatSnippet(new CombatSnippet(player.getUniqueId(), combatMode, new LinkedList<>()));
+            // Reset the players combat snippet history.
+            snippets.clear();
         });
 
         // Send the current dataset.
@@ -148,12 +216,50 @@ public class AntiCheatPlugin extends JavaPlugin {
         });
     }
 
+    private void captureSnippet(Player player, CombatantProfile profile) {
+        if (profile.getActiveCombatSnippet().getPacketHistory().isEmpty()) {
+            return;
+        }
+
+        CombatSnippet oldSnippet = profile.getActiveCombatSnippet();
+        CombatMode combatMode = oldSnippet.getCombatMode();
+        if (combatMode == CombatMode.EXEMPT) {
+            return;
+        }
+
+        CombatSnippet newSnippet = new CombatSnippet(player.getUniqueId(), combatMode, new LinkedList<>());
+        profile.setActiveCombatSnippet(newSnippet);
+        profile.setExpiry(combatExpiryMillis);
+
+        int historyLength = oldSnippet.getPacketHistory().size();
+
+        if (historyLength < minHistoryLength) {
+            if (combatMode != CombatMode.UNKNOWN) {
+                player.sendMessage("Ignored current combat snippet as it was too small");
+            }
+            return;
+        }
+
+        profile.getCombatSnippetHistory().add(oldSnippet);
+
+        if (combatMode != CombatMode.UNKNOWN) {
+            int totalQueued = profile.getCombatSnippetHistory().size();
+            player.sendMessage("Successfully captured combat snippet of history length: " + historyLength);
+            player.sendMessage("Total queued snippets: " + totalQueued);
+        }
+    }
+
     private void onUseEntity(PacketEvent event) {
         WrapperPlayClientUseEntity packet = new WrapperPlayClientUseEntity(event.getPacket());
-        if (packet.getType() != EnumWrappers.EntityUseAction.ATTACK)
+        if (packet.getType() != EnumWrappers.EntityUseAction.ATTACK) {
             return;
+        }
 
         Player player = event.getPlayer();
+        if (player.getGameMode() != GameMode.SURVIVAL) {
+            return;
+        }
+
         CombatantProfile profile = combatants.get(player);
         Location origin = player.getLocation();
 
@@ -170,8 +276,21 @@ public class AntiCheatPlugin extends JavaPlugin {
 
             CombatSnippet snippet = new CombatSnippet(player.getUniqueId(), combatMode, new LinkedList<>());
 
-            profile = new CombatantProfile(origin, currentTime, expiry, snippet);
+            profile = new CombatantProfile(origin, currentTime, expiry, snippet, new LinkedList<>());
             combatants.put(player, profile);
+
+            if (combatMode != CombatMode.UNKNOWN) {
+                player.sendMessage("Starting a new combat snippet");
+            }
+            return;
+        }
+
+        if (profile.isActiveSnippetExpired()) {
+            captureSnippet(player, profile);
+            profile.setExpiry(System.currentTimeMillis() + combatExpiryMillis);
+            if (profile.getActiveCombatSnippet().getCombatMode() != CombatMode.UNKNOWN) {
+                player.sendMessage("Starting a new combat snippet");
+            }
             return;
         }
 
@@ -191,9 +310,16 @@ public class AntiCheatPlugin extends JavaPlugin {
     }
 
     private void onPosition(PacketEvent event) {
-        CombatantProfile profile = combatants.get(event.getPlayer());
-        if (profile == null)
+        Player player = event.getPlayer();
+        CombatantProfile profile = combatants.get(player);
+        if (profile == null || player.getGameMode() != GameMode.SURVIVAL) {
             return;
+        }
+
+        if (profile.isActiveSnippetExpired()) {
+            captureSnippet(player, profile);
+            return;
+        }
 
         WrapperPlayClientPosition packet = new WrapperPlayClientPosition(event.getPacket());
         Location origin = profile.getLastLocation();
@@ -205,14 +331,21 @@ public class AntiCheatPlugin extends JavaPlugin {
 
         PlayerPacket playerPacket = PlayerPacket.position(time, x, y, z);
         profile.getActiveCombatSnippet().getPacketHistory().add(playerPacket);
-        profile.setLastLocation(event.getPlayer().getLocation());
+        profile.setLastLocation(player.getLocation());
         profile.setLastPacket(System.currentTimeMillis());
     }
 
     private void onLook(PacketEvent event) {
-        CombatantProfile profile = combatants.get(event.getPlayer());
-        if (profile == null)
+        Player player = event.getPlayer();
+        CombatantProfile profile = combatants.get(player);
+        if (profile == null || player.getGameMode() != GameMode.SURVIVAL) {
             return;
+        }
+
+        if (profile.isActiveSnippetExpired()) {
+            captureSnippet(player, profile);
+            return;
+        }
 
         WrapperPlayClientLook packet = new WrapperPlayClientLook(event.getPacket());
         Location origin = profile.getLastLocation();
@@ -223,14 +356,21 @@ public class AntiCheatPlugin extends JavaPlugin {
 
         PlayerPacket playerPacket = PlayerPacket.look(time, yaw, pitch);
         profile.getActiveCombatSnippet().getPacketHistory().add(playerPacket);
-        profile.setLastLocation(event.getPlayer().getLocation());
+        profile.setLastLocation(player.getLocation());
         profile.setLastPacket(System.currentTimeMillis());
     }
 
     private void onPositionLook(PacketEvent event) {
-        CombatantProfile profile = combatants.get(event.getPlayer());
-        if (profile == null)
+        Player player = event.getPlayer();
+        CombatantProfile profile = combatants.get(player);
+        if (profile == null || player.getGameMode() != GameMode.SURVIVAL) {
             return;
+        }
+
+        if (profile.isActiveSnippetExpired()) {
+            captureSnippet(player, profile);
+            return;
+        }
 
         WrapperPlayClientPositionLook packet = new WrapperPlayClientPositionLook(event.getPacket());
         Location origin = profile.getLastLocation();
@@ -244,7 +384,7 @@ public class AntiCheatPlugin extends JavaPlugin {
 
         PlayerPacket playerPacket = PlayerPacket.positionLook(time, x, y, z, yaw, pitch);
         profile.getActiveCombatSnippet().getPacketHistory().add(playerPacket);
-        profile.setLastLocation(event.getPlayer().getLocation());
+        profile.setLastLocation(player.getLocation());
         profile.setLastPacket(System.currentTimeMillis());
     }
 }

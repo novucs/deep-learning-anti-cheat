@@ -53,9 +53,10 @@ public class ConnectionManager extends Thread {
         while (!Thread.interrupted()) {
             try {
                 while (!Thread.interrupted()) {
-                    socket = new Socket(host.get(), port.get());
-                    DataOutputStream out = new DataOutputStream(socket.getOutputStream());
                     Request request = sendQueue.take();
+                    socket = new Socket(host.get(), port.get());
+                    socket.setSoTimeout(2000);
+                    DataOutputStream out = new DataOutputStream(socket.getOutputStream());
                     out.writeUTF(GSON.toJson(request.getPacket()));
                     out.flush();
 
