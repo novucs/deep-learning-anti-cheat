@@ -287,6 +287,7 @@ public class AntiCheatPlugin extends JavaPlugin implements Listener {
         if (profile.isActiveSnippetExpired()) {
             captureSnippet(player, profile);
             profile.setExpiry(System.currentTimeMillis() + combatExpiryMillis);
+            profile.setLastPacket(System.currentTimeMillis());
             if (profile.getActiveCombatSnippet().getCombatMode() != CombatMode.UNKNOWN) {
                 player.sendMessage("Starting a new combat snippet");
             }

@@ -49,22 +49,35 @@ public class ConnectionManager extends Thread {
     @Override
     public void run() {
         Socket socket = null;
+        DataInputStream in;
+        DlacOutputStream out = null;
 
         while (!Thread.interrupted()) {
             try {
+                socket = new Socket(host.get(), port.get());
+                socket.setSoTimeout(2000);
+                out = new DlacOutputStream(socket.getOutputStream());
+                in = new DataInputStream(socket.getInputStream());
+
                 while (!Thread.interrupted()) {
                     Request request = sendQueue.take();
-                    socket = new Socket(host.get(), port.get());
-                    socket.setSoTimeout(2000);
-                    DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-                    out.writeUTF(GSON.toJson(request.getPacket()));
+                    out.writePacket(request.getPacket());
                     out.flush();
 
-                    DataInputStream in = new DataInputStream(socket.getInputStream());
-                    String response = in.readUTF();
-                    request.getResponseCallback().accept(response);
-                    socket.close();
+                    if (request.getPacket().getType() == Packet.Type.DATASET) {
+                        int totalX = in.readInt();
+                        int updatedCount = in.readInt();
+                        String response = "Updated combat data. Total: " + totalX + " Updated: " + updatedCount;
+                        request.getResponseCallback().accept(response);
+                    } else {
+                        String response = "Totally just ignored your packet <:";
+                        request.getResponseCallback().accept(response);
+                    }
                 }
+
+                out.close();
+                in.close();
+                socket.close();
             } catch (IOException e) {
                 plugin.getLogger().log(Level.SEVERE, "Unable to communicate with classification server!");
                 plugin.getLogger().log(Level.SEVERE, "Retrying in 30 seconds...");
@@ -80,6 +93,12 @@ public class ConnectionManager extends Thread {
             } finally {
                 if (socket != null) {
                     try {
+                        if (out == null) {
+                            out = new DlacOutputStream(socket.getOutputStream());
+                        }
+                        out.writeInt(0); // Tell the server we're disconnecting.
+                        out.flush();
+                        out.close();
                         socket.close();
                     } catch (IOException ignore) {
                     }

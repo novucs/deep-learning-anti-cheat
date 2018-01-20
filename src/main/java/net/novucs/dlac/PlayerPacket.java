@@ -23,6 +23,7 @@ public interface PlayerPacket {
     }
 
     Type getType();
+    long getTime();
 
     @AllArgsConstructor
     @Getter

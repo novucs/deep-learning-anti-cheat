@@ -21,8 +21,9 @@ public interface Packet {
     @AllArgsConstructor
     @Getter
     enum Type {
-        DATASET(0),
-        CHECK(1);
+        DISCONNECT(0),
+        DATASET(1),
+        CHECK(2);
         private final int id;
     }
 
