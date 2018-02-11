@@ -1,10 +1,8 @@
 package net.novucs.dlac;
 
-import com.google.gson.Gson;
 import lombok.Data;
 
 import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.concurrent.BlockingQueue;
@@ -17,7 +15,6 @@ import java.util.logging.Level;
 
 public class ConnectionManager extends Thread {
 
-    private static final Gson GSON = new Gson();
     private final BlockingQueue<Request> sendQueue = new LinkedBlockingQueue<>();
     private final AntiCheatPlugin plugin;
     private final AtomicReference<String> host = new AtomicReference<>();
@@ -61,18 +58,9 @@ public class ConnectionManager extends Thread {
 
                 while (!Thread.interrupted()) {
                     Request request = sendQueue.take();
-                    out.writePacket(request.getPacket());
-                    out.flush();
-
-                    if (request.getPacket().getType() == Packet.Type.DATASET) {
-                        int totalX = in.readInt();
-                        int updatedCount = in.readInt();
-                        String response = "Updated combat data. Total: " + totalX + " Updated: " + updatedCount;
-                        request.getResponseCallback().accept(response);
-                    } else {
-                        String response = "Totally just ignored your packet <:";
-                        request.getResponseCallback().accept(response);
-                    }
+                    Packet packet = request.getPacket();
+                    Consumer<String> callback = request.getResponseCallback();
+                    packet.handle(out, in, callback);
                 }
 
                 out.close();
@@ -96,7 +84,9 @@ public class ConnectionManager extends Thread {
                         if (out == null) {
                             out = new DlacOutputStream(socket.getOutputStream());
                         }
-                        out.writeInt(0); // Tell the server we're disconnecting.
+
+                        // Tell the server we're disconnecting.
+                        Packet.disconnect().handle(out, null, response -> {});
                         out.flush();
                         out.close();
                         socket.close();

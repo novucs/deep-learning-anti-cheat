@@ -10,28 +10,8 @@ public class DlacOutputStream extends DataOutputStream {
         super(o);
     }
 
-    public void writePacket(Packet packet) throws IOException {
-        writeInt(packet.getType().getId());
-        switch (packet.getType()) {
-            case DATASET:
-                Packet.DatasetPacket dataset = (Packet.DatasetPacket) packet;
-                writeInt(dataset.getCombatSnippets().size());
-                for (CombatSnippet snippet : dataset.getCombatSnippets()) {
-                    writeCombatSnippet(snippet);
-                }
-                break;
-            case CHECK:
-                break;
-        }
-    }
-
     public void writeCombatSnippet(CombatSnippet snippet) throws IOException {
-        CombatMode mode = snippet.getCombatMode();
-        if (mode != CombatMode.HACKING && mode != CombatMode.VANILLA) {
-            return;
-        }
-
-        writeInt(mode == CombatMode.VANILLA ? 0 : 1);
+        writeInt(snippet.getCombatMode().getId());
         writeInt(snippet.getPacketHistory().size());
         for (PlayerPacket packet : snippet.getPacketHistory()) {
             writePlayerPacket(packet);

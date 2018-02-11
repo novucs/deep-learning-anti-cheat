@@ -9,13 +9,17 @@ import java.util.Map;
 @AllArgsConstructor
 @Getter
 public enum CombatMode {
-    UNKNOWN(0),
-    VANILLA(1),
-    HACKING(2),
+    VANILLA(0),
+    HACKING(1),
+    UNKNOWN(2),
     EXEMPT(3);
 
     private static final Map<String, CombatMode> BY_NAME = new HashMap<>();
     private final int id;
+
+    public boolean isLogged() {
+        return this == VANILLA || this == HACKING;
+    }
 
     public static CombatMode match(String name) {
         name = name.toUpperCase();
